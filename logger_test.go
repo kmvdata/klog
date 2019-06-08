@@ -16,10 +16,10 @@ func TestHelloWorld(t *testing.T) {
 	// Test Code
 	for i := 0; i < 10000; i++ {
 		Info.Printf("Hello %s", "World!")
+		Info.Println("Hello", "Println")
 		Error.Printf("Hello %s", "Error!")
 	}
 
 	// Sleep make sure that uncompress *.log can be deleted.
 	time.Sleep(time.Duration(2) * time.Second)
-
 }

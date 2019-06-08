@@ -26,11 +26,11 @@ var (
 	// 日志是否同时输入到stdout中
 	stdoutFlag bool
 
-	// 文件重命名的时候，需要加锁
-	mu sync.Mutex // ensures atomic writes; protects the following fields
-
 	// 是否需要对Archive进行gzip压缩存储
 	compressArchive bool
+
+	// 文件重命名的时候，需要加锁
+	mu sync.Mutex // ensures atomic writes; protects the following fields
 )
 
 type Logger struct {
@@ -41,13 +41,13 @@ type Logger struct {
 // 设置日志文件, 文件名，日志格式，是（同时）否向stdout输出日志
 func InitKLog(iFileName string, iLogFlag int, iStdoutFlag bool) {
 	if nil != logFile {
-		fmt.Printf("Close old log file Error: %v", logFile.Close())
+		log.Printf("Close old log file Error: %v", logFile.Close())
 	}
 
 	logFileName = iFileName
 	logFileDir, err := filepath.Abs(logFileName)
 	if "" == logFileDir || nil != err {
-		fmt.Printf("Parse klog dir failed: %s, %v", logFileDir, err)
+		log.Printf("Parse klog dir failed: %s, %v", logFileDir, err)
 		return
 	}
 	logFileDir = filepath.Dir(logFileDir)
@@ -98,7 +98,7 @@ func ArchiveLogFile() {
 	defer mu.Unlock()
 	fInfo, err := os.Stat(logFileName)
 	if nil != err {
-		fmt.Printf("getLogFileSize Error: %v", err)
+		log.Printf("[Error] %v getLogFileSize Error: %v", time.Now().String(), err)
 		return
 	}
 
@@ -184,42 +184,48 @@ func SetMaxFileSizeMB(size int) {
 	maxFileSize = int64(size) * 1024 * 1024
 }
 
+// 设置是否对归档日志进行压缩
 func SetCompressArchive(flag bool) {
 	compressArchive = flag
 }
 
+// 设置日志标志
+func SetLogFlag(flag int) {
+	logFlag = flag
+}
+
 func (l *Logger) Fatalf(format string, v ...interface{}) {
 	checkLogFileSize()
+
 	if nil != l.stdoutLogger {
-		l.stdoutLogger.Printf(format, v...)
+		_ = l.stdoutLogger.Output(2, fmt.Sprintf(format, v...))
 	}
 	if nil != l.logger {
-		l.logger.Fatalf(format, v...)
+		_ = l.logger.Output(2, fmt.Sprintf(format, v...))
+		os.Exit(1)
 	}
 }
 
 func (l *Logger) Printf(format string, v ...interface{}) {
 	checkLogFileSize()
 	if nil != l.logger {
-		l.logger.Printf(format, v...)
+		_ = l.logger.Output(2, fmt.Sprintf(format, v...))
 	}
 
 	if nil != l.stdoutLogger {
-		l.stdoutLogger.Printf(format, v...)
+		_ = l.stdoutLogger.Output(2, fmt.Sprintf(format, v...))
 	}
-
 }
 
-func getLogFileSize() int64 {
-	if "" == logFileName {
-		return 0
+func (l *Logger) Println(v ...interface{}) {
+	checkLogFileSize()
+	if nil != l.logger {
+		_ = l.logger.Output(2, fmt.Sprintln(v...))
 	}
-	fInfo, err := os.Stat(logFileName)
-	if nil != err {
-		fmt.Printf("getLogFileSize Error: %v", err)
-		return 0
+
+	if nil != l.stdoutLogger {
+		_ = l.stdoutLogger.Output(2, fmt.Sprintln(v...))
 	}
-	return fInfo.Size()
 }
 
 func checkLogFileSize() {
@@ -257,7 +263,7 @@ func checkLogFileSize() {
 	// 加锁后，再获取并检测一次文件大小，防止异步时重新加载
 	fInfo, err = os.Stat(logFileName)
 	if nil != err {
-		fmt.Printf("getLogFileSize Error: %v", err)
+		log.Printf("getLogFileSize Error: %v", err)
 		return
 	}
 	currSize = fInfo.Size()
