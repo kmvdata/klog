@@ -27,6 +27,8 @@ var (
 	// 是否需要对Archive进行gzip压缩存储
 	compressArchive bool
 
+	defaultCalldepth int
+
 	// 文件重命名的时候，需要加锁
 	mu sync.Mutex // ensures atomic writes; protects the following fields
 )
@@ -39,6 +41,7 @@ type klogger struct {
 func init() {
 	InitKLog("", os.O_CREATE|os.O_APPEND|os.O_RDWR, true)
 	SetMaxFileSizeMB(10)
+	SetDefaultCalldepth(3)
 }
 
 func newLogger(out io.Writer, prefix string, flag int, stdoutFlag bool) *klogger {
@@ -138,18 +141,21 @@ func compressArchiveFile(archiveName string) {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	defer fw.Close()
 
 	// 实例化心得gzip.Writer
 	gw := gzip.NewWriter(fw)
-	defer gw.Close()
 
 	// 获取要打包的文件信息
 	fr, err := os.Open(archiveName)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	defer fr.Close()
+
+	defer func() {
+		_ = fw.Close()
+		_ = gw.Close()
+		_ = fr.Close()
+	}()
 
 	// 获取文件头信息
 	fi, err := fr.Stat()
@@ -190,48 +196,19 @@ func SetMaxFileSizeMB(size int) {
 	maxFileSize = int64(size) * 1024 * 1024
 }
 
+// 设置默认的打印深度
+func SetDefaultCalldepth(calldepth int) {
+	defaultCalldepth = calldepth
+}
+
 // 设置是否对归档日志进行压缩
-func (l *klogger) SetCompressArchive(flag bool) {
+func SetCompressArchive(flag bool) {
 	compressArchive = flag
 }
 
 // 设置日志标志
-func (l *klogger) SetLogFlag(flag int) {
+func SetLogFlag(flag int) {
 	logFlag = flag
-}
-
-func (l *klogger) Fatalf(format string, v ...interface{}) {
-	checkLogFileSize()
-
-	if nil != l.stdoutLogger {
-		_ = l.stdoutLogger.Output(2, fmt.Sprintf(format, v...))
-	}
-	if nil != l.logger {
-		_ = l.logger.Output(2, fmt.Sprintf(format, v...))
-		os.Exit(1)
-	}
-}
-
-func (l *klogger) Printf(format string, v ...interface{}) {
-	checkLogFileSize()
-	if nil != l.logger {
-		_ = l.logger.Output(2, fmt.Sprintf(format, v...))
-	}
-
-	if nil != l.stdoutLogger {
-		_ = l.stdoutLogger.Output(2, fmt.Sprintf(format, v...))
-	}
-}
-
-func (l *klogger) Println(v ...interface{}) {
-	checkLogFileSize()
-	if nil != l.logger {
-		_ = l.logger.Output(2, fmt.Sprintln(v...))
-	}
-
-	if nil != l.stdoutLogger {
-		_ = l.stdoutLogger.Output(2, fmt.Sprintln(v...))
-	}
 }
 
 func checkLogFileSize() {
@@ -291,4 +268,50 @@ func checkLogFileSize() {
 
 	InitKLog(logFileName, logFlag, stdoutFlag)
 	go compressArchiveFile(archiveName)
+}
+
+func (l *klogger) Fatalf(format string, v ...interface{}) {
+	l.FatalfWithCalldepth(defaultCalldepth, format, v...)
+}
+
+func (l *klogger) FatalfWithCalldepth(calldepth int, format string, v ...interface{}) {
+	checkLogFileSize()
+
+	if nil != l.stdoutLogger {
+		_ = l.stdoutLogger.Output(calldepth, fmt.Sprintf(format, v...))
+	}
+	if nil != l.logger {
+		_ = l.logger.Output(calldepth, fmt.Sprintf(format, v...))
+		os.Exit(1)
+	}
+}
+
+func (l *klogger) Printf(format string, v ...interface{}) {
+	l.PrintfWithCalldepth(defaultCalldepth, format, v...)
+}
+
+func (l *klogger) PrintfWithCalldepth(calldepth int, format string, v ...interface{}) {
+	checkLogFileSize()
+	if nil != l.logger {
+		_ = l.logger.Output(calldepth, fmt.Sprintf(format, v...))
+	}
+
+	if nil != l.stdoutLogger {
+		_ = l.stdoutLogger.Output(calldepth, fmt.Sprintf(format, v...))
+	}
+}
+
+func (l *klogger) Println(v ...interface{}) {
+	l.PrintlnWithCalldepth(defaultCalldepth, v...)
+}
+
+func (l *klogger) PrintlnWithCalldepth(calldepth int, v ...interface{}) {
+	checkLogFileSize()
+	if nil != l.logger {
+		_ = l.logger.Output(calldepth, fmt.Sprintln(v...))
+	}
+
+	if nil != l.stdoutLogger {
+		_ = l.stdoutLogger.Output(calldepth, fmt.Sprintln(v...))
+	}
 }
