@@ -13,13 +13,11 @@ import (
 )
 
 var (
-	Info  *Logger
-	Error *Logger
-
+	Info        *klogger
+	Error       *klogger
 	logFileName string
 	logFlag     int
 	logFile     *os.File
-
 	// 日志文件最大size
 	maxFileSize int64
 
@@ -33,21 +31,42 @@ var (
 	mu sync.Mutex // ensures atomic writes; protects the following fields
 )
 
-type Logger struct {
+type klogger struct {
 	logger       *log.Logger
 	stdoutLogger *log.Logger
+}
+
+func init() {
+	InitKLog("", os.O_CREATE|os.O_APPEND|os.O_RDWR, true)
+	SetMaxFileSizeMB(10)
+}
+
+func newLogger(out io.Writer, prefix string, flag int, stdoutFlag bool) *klogger {
+	logger := new(klogger)
+
+	if nil != out {
+		logger.logger = log.New(out, prefix, flag)
+	}
+
+	if true == stdoutFlag {
+		logger.stdoutLogger = log.New(os.Stdout, prefix, flag)
+	}
+	return logger
 }
 
 // 设置日志文件, 文件名，日志格式，是（同时）否向stdout输出日志
 func InitKLog(iFileName string, iLogFlag int, iStdoutFlag bool) {
 	if nil != logFile {
-		log.Printf("Close old log file Error: %v", logFile.Close())
+		err := logFile.Close()
+		if nil != err {
+			log.Printf("[Error] Close old log file Error: %v", logFile.Close())
+		}
 	}
 
 	logFileName = iFileName
 	logFileDir, err := filepath.Abs(logFileName)
 	if "" == logFileDir || nil != err {
-		log.Printf("Parse klog dir failed: %s, %v", logFileDir, err)
+		log.Printf("[Error] Parse klog dir failed: %s, %v", logFileDir, err)
 		return
 	}
 	logFileDir = filepath.Dir(logFileDir)
@@ -55,7 +74,7 @@ func InitKLog(iFileName string, iLogFlag int, iStdoutFlag bool) {
 	if _, err := os.Stat(logFileDir); os.IsNotExist(err) {
 		err = os.MkdirAll(logFileDir, os.ModePerm)
 		if nil != err {
-			fmt.Printf("Create klog dir failed: %s, %v", logFileDir, err)
+			log.Printf("[Error] Create klog dir failed: %s, %v", logFileDir, err)
 			return
 		}
 	}
@@ -68,7 +87,7 @@ func InitKLog(iFileName string, iLogFlag int, iStdoutFlag bool) {
 
 	logFile, err := os.OpenFile(logFileName, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0660)
 	if err != nil {
-		log.Printf("Failed to open log logFile: %v, logFile: %v", logFileName, logFile)
+		log.Printf("[Error] Failed to open log logFile: %v, logFile: %v", logFileName, logFile)
 		logFile = nil
 	}
 	// 日志文件格式:log包含时间及文件行数
@@ -76,22 +95,9 @@ func InitKLog(iFileName string, iLogFlag int, iStdoutFlag bool) {
 	Error = newLogger(logFile, "[Error] ", logFlag, stdoutFlag)
 }
 
-func newLogger(out io.Writer, prefix string, flag int, stdoutFlag bool) *Logger {
-	logger := new(Logger)
-
-	if nil != out {
-		logger.logger = log.New(out, prefix, flag)
-	}
-
-	if true == stdoutFlag {
-		logger.stdoutLogger = log.New(os.Stdout, prefix, flag)
-	}
-	return logger
-}
-
 // 备份日志文件
 // 出于效率考虑，klog默认不支持隔日自动创建新日志文件，自动备份日志的触发条件，只有日志文件大小。
-// 如有需求隔日创建，建议使用定时调度程序在00:00:00调用这个方法。以后会进行跨平台优化处理。
+// 如有需求隔日创建，建议使用定时调度程序在00:00:00调用这个方法。
 func ArchiveLogFile() {
 	// 加锁，对文件进行重命名
 	mu.Lock()
@@ -170,7 +176,7 @@ func compressArchiveFile(archiveName string) {
 }
 
 // 返回日志文件最大size，单位是byte
-func GetMaxFileSize() int64 {
+func (l *klogger) GetMaxFileSize() int64 {
 	return maxFileSize
 }
 
@@ -185,16 +191,16 @@ func SetMaxFileSizeMB(size int) {
 }
 
 // 设置是否对归档日志进行压缩
-func SetCompressArchive(flag bool) {
+func (l *klogger) SetCompressArchive(flag bool) {
 	compressArchive = flag
 }
 
 // 设置日志标志
-func SetLogFlag(flag int) {
+func (l *klogger) SetLogFlag(flag int) {
 	logFlag = flag
 }
 
-func (l *Logger) Fatalf(format string, v ...interface{}) {
+func (l *klogger) Fatalf(format string, v ...interface{}) {
 	checkLogFileSize()
 
 	if nil != l.stdoutLogger {
@@ -206,7 +212,7 @@ func (l *Logger) Fatalf(format string, v ...interface{}) {
 	}
 }
 
-func (l *Logger) Printf(format string, v ...interface{}) {
+func (l *klogger) Printf(format string, v ...interface{}) {
 	checkLogFileSize()
 	if nil != l.logger {
 		_ = l.logger.Output(2, fmt.Sprintf(format, v...))
@@ -217,7 +223,7 @@ func (l *Logger) Printf(format string, v ...interface{}) {
 	}
 }
 
-func (l *Logger) Println(v ...interface{}) {
+func (l *klogger) Println(v ...interface{}) {
 	checkLogFileSize()
 	if nil != l.logger {
 		_ = l.logger.Output(2, fmt.Sprintln(v...))
@@ -285,18 +291,4 @@ func checkLogFileSize() {
 
 	InitKLog(logFileName, logFlag, stdoutFlag)
 	go compressArchiveFile(archiveName)
-}
-
-func init() {
-
-	// 默认对归档文件进行压缩存档
-	compressArchive = true
-
-	if 0 == logFlag {
-		logFlag = log.Ldate | log.Lmicroseconds | log.Lshortfile
-	}
-
-	if 0 == maxFileSize {
-		SetMaxFileSizeMB(10)
-	}
 }

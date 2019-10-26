@@ -18,8 +18,8 @@ User to output logs in your application.
 - Your func main() code:
 		
 		func main() {
-			// Init
-			klog.InitKLog("./log/my-log", 0, true)
+			// Init by default for stdout 
+			// klog.InitKLog("./log/my-log", 0, true)
 		
 			// Set Max Size
 			// Or klog.SetMaxFileSizeMB(200) ==> Set to 200MB
