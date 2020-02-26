@@ -67,31 +67,33 @@ func InitKLog(iFileName string, iLogFlag int, iStdoutFlag bool) {
 	}
 
 	logFileName = iFileName
-	logFileDir, err := filepath.Abs(logFileName)
-	if "" == logFileDir || nil != err {
-		log.Printf("[Error] Parse klog dir failed: %s, %v", logFileDir, err)
-		return
-	}
-	logFileDir = filepath.Dir(logFileDir)
-	// 创建目录
-	if _, err := os.Stat(logFileDir); os.IsNotExist(err) {
-		err = os.MkdirAll(logFileDir, os.ModePerm)
-		if nil != err {
-			log.Printf("[Error] Create klog dir failed: %s, %v", logFileDir, err)
+	if "" != logFileName {
+		logFileDir, err := filepath.Abs(logFileName)
+		if "" == logFileDir || nil != err {
+			log.Printf("[Error] Parse klog dir failed: %s, %v", logFileDir, err)
 			return
 		}
-	}
+		logFileDir = filepath.Dir(logFileDir)
+		// 创建目录
+		if _, err := os.Stat(logFileDir); os.IsNotExist(err) {
+			err = os.MkdirAll(logFileDir, os.ModePerm)
+			if nil != err {
+				log.Printf("[Error] Create klog dir failed: %s, %v", logFileDir, err)
+				return
+			}
+		}
 
-	// 默认不允许日志标志位为空
-	if 0 != iLogFlag {
-		logFlag = iLogFlag
-	}
-	stdoutFlag = iStdoutFlag
+		// 默认不允许日志标志位为空
+		if 0 != iLogFlag {
+			logFlag = iLogFlag
+		}
+		stdoutFlag = iStdoutFlag
 
-	logFile, err := os.OpenFile(logFileName, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0660)
-	if err != nil {
-		log.Printf("[Error] Failed to open log logFile: %v, logFile: %v", logFileName, logFile)
-		logFile = nil
+		logFile, err := os.OpenFile(logFileName, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0660)
+		if err != nil {
+			log.Printf("[Error] Failed to open log logFile: %v, logFile: %v", logFileName, logFile)
+			logFile = nil
+		}
 	}
 	// 日志文件格式:log包含时间及文件行数
 	Info = newLogger(logFile, "[Info]  ", logFlag, stdoutFlag)
