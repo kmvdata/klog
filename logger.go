@@ -83,18 +83,18 @@ func InitKLog(iFileName string, iLogFlag int, iStdoutFlag bool) {
 			}
 		}
 
-		// 默认不允许日志标志位为空
-		if 0 != iLogFlag {
-			logFlag = iLogFlag
-		}
-		stdoutFlag = iStdoutFlag
-
 		logFile, err := os.OpenFile(logFileName, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0660)
 		if err != nil {
 			log.Printf("[Error] Failed to open log logFile: %v, logFile: %v", logFileName, logFile)
 			logFile = nil
 		}
 	}
+
+	// 默认不允许日志标志位为空
+	if 0 != iLogFlag {
+		logFlag = iLogFlag
+	}
+	stdoutFlag = iStdoutFlag
 	// 日志文件格式:log包含时间及文件行数
 	Info = newLogger(logFile, "[Info]  ", logFlag, stdoutFlag)
 	Error = newLogger(logFile, "[Error] ", logFlag, stdoutFlag)

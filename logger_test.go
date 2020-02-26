@@ -7,7 +7,7 @@ import (
 
 func TestHelloWorld(t *testing.T) {
 	// Init
-	InitKLog("./log/my-log", 0, true)
+	// InitKLog("./log/my-log", 0, true)
 
 	// Set Max Size
 	// Or klog.SetMaxFileSizeMB(200) ==> Set to 200MB
