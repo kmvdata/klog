@@ -62,7 +62,7 @@ func InitKLog(iFileName string, iLogFlag int, iStdoutFlag bool) {
 	if nil != logFile {
 		err := logFile.Close()
 		if nil != err {
-			log.Printf("[Error] Close old log file Error: %v", logFile.Close())
+			log.Fatalf("[Error] Close old log file Error: %v", logFile.Close())
 		}
 	}
 
@@ -70,23 +70,20 @@ func InitKLog(iFileName string, iLogFlag int, iStdoutFlag bool) {
 	if "" != logFileName {
 		logFileDir, err := filepath.Abs(logFileName)
 		if "" == logFileDir || nil != err {
-			log.Printf("[Error] Parse klog dir failed: %s, %v", logFileDir, err)
-			return
+			log.Fatalf("[Error] Parse klog dir failed: %s, %v", logFileDir, err)
 		}
 		logFileDir = filepath.Dir(logFileDir)
 		// 创建目录
 		if _, err := os.Stat(logFileDir); os.IsNotExist(err) {
 			err = os.MkdirAll(logFileDir, os.ModePerm)
 			if nil != err {
-				log.Printf("[Error] Create klog dir failed: %s, %v", logFileDir, err)
-				return
+				log.Fatalf("[Error] Create klog dir failed: %s, %v", logFileDir, err)
 			}
 		}
 
-		logFile, err := os.OpenFile(logFileName, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0660)
+		logFile, err = os.OpenFile(logFileName, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0660)
 		if err != nil {
-			log.Printf("[Error] Failed to open log logFile: %v, logFile: %v", logFileName, logFile)
-			logFile = nil
+			log.Fatalf("[Error] Failed to open log logFile: %v, logFile: %v", logFileName, logFile)
 		}
 	}
 
