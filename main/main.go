@@ -1,7 +1,7 @@
 package main
 
 import (
-    "github.com/kmvdata/klog/klog"
+    "github.com/kmvdata/klog"
 )
 
 func main() {
